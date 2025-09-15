@@ -505,9 +505,45 @@
     </div>
 
     <script>
-        let priorities = {};
+        let priorities = loadPriorities();
         let currentWeek = getCurrentWeekKey();
         let editingIndex = -1;
+
+        function loadPriorities() {
+            try {
+                // Test if localStorage is available
+                if (typeof(Storage) === "undefined") {
+                    console.error("localStorage is not supported by this browser");
+                    showNotification("Warning: Data will not be saved - localStorage not supported");
+                    return {};
+                }
+                
+                const saved = localStorage.getItem('weeklyPriorities');
+                console.log("Loading data from localStorage:", saved ? "Data found" : "No data found");
+                return saved ? JSON.parse(saved) : {};
+            } catch (error) {
+                console.error("Error loading from localStorage:", error);
+                showNotification("Warning: Could not load saved data");
+                return {};
+            }
+        }
+
+        function savePriorities() {
+            try {
+                localStorage.setItem('weeklyPriorities', JSON.stringify(priorities));
+                console.log("Data saved to localStorage successfully");
+                
+                // Verify it was actually saved
+                const test = localStorage.getItem('weeklyPriorities');
+                if (!test) {
+                    console.error("Save verification failed - data not found after saving");
+                    showNotification("Warning: Data may not have been saved properly");
+                }
+            } catch (error) {
+                console.error("Error saving to localStorage:", error);
+                showNotification("Warning: Could not save data - " + error.message);
+            }
+        }
 
         function getCurrentWeekKey() {
             const today = new Date();
@@ -600,6 +636,7 @@
             };
             
             priorities[currentWeek].push(newPriority);
+            savePriorities();
             
             // Clear form
             document.getElementById('taskTitle').value = '';
@@ -688,6 +725,7 @@
             if (task) {
                 task.status = 'in-progress';
                 task.startDate = new Date().toISOString();
+                savePriorities();
                 renderPriorities();
             }
         }
@@ -698,6 +736,7 @@
             if (task) {
                 task.status = 'completed';
                 task.completedDate = new Date().toISOString();
+                savePriorities();
                 renderPriorities();
             }
         }
@@ -727,6 +766,7 @@
                 task.meetings = meetingsText ? meetingsText.split('\n').filter(m => m.trim()) : [];
                 
                 closeModal();
+                savePriorities();
                 renderPriorities();
             }
         }
@@ -742,6 +782,7 @@
                 const index = weekPriorities.findIndex(t => t.id === id);
                 if (index > -1) {
                     weekPriorities.splice(index, 1);
+                    savePriorities();
                     renderPriorities();
                 }
             }
