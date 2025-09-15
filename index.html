@@ -348,6 +348,43 @@
             margin-left: 10px;
         }
 
+        .subtasks-header {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            transition: color 0.2s ease;
+            margin-bottom: 10px;
+        }
+
+        .subtasks-header:hover {
+            color: #4f46e5;
+        }
+
+        .expand-icon {
+            margin-right: 8px;
+            font-size: 0.8rem;
+            transition: transform 0.3s ease;
+            color: #6b7280;
+        }
+
+        .expand-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .subtasks-list {
+            max-height: 500px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+            opacity: 1;
+        }
+
+        .subtasks-list.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+        }
+
         .priority-actions {
             display: flex;
             gap: 10px;
@@ -600,6 +637,10 @@
                                 { id: 3, text: '', completed: false }
                             ];
                         }
+                        // Default to expanded for existing tasks
+                        if (task.subtasksExpanded === undefined) {
+                            task.subtasksExpanded = true;
+                        }
                     });
                 }
                 
@@ -720,7 +761,8 @@
                     { id: 1, text: '', completed: false },
                     { id: 2, text: '', completed: false },
                     { id: 3, text: '', completed: false }
-                ]
+                ],
+                subtasksExpanded: true
             };
             
             priorities[currentWeek].push(newPriority);
@@ -798,8 +840,11 @@
                     ` : ''}
                     
                     <div class="meetings-section">
-                        <h4>Subtasks ${getSubtaskProgress(task.subtasks)}</h4>
-                        <div class="subtasks-list">
+                        <h4 class="subtasks-header" onclick="toggleSubtasks(${task.id})">
+                            <span class="expand-icon ${task.subtasksExpanded ? '' : 'collapsed'}" id="expand-${task.id}">▼</span>
+                            Subtasks ${getSubtaskProgress(task.subtasks)}
+                        </h4>
+                        <div class="subtasks-list ${task.subtasksExpanded ? '' : 'collapsed'}" id="subtasks-${task.id}">
                             ${task.subtasks.map(subtask => `
                                 <div class="subtask-item">
                                     <input type="checkbox" 
@@ -937,6 +982,28 @@
             }
             
             return `<span class="subtask-progress">(${completed}/${total} complete)</span>`;
+        }
+
+        function toggleSubtasks(taskId) {
+            const weekPriorities = priorities[currentWeek];
+            const task = weekPriorities.find(t => t.id === taskId);
+            
+            if (task) {
+                task.subtasksExpanded = !task.subtasksExpanded;
+                savePriorities();
+                
+                // Update the UI immediately
+                const subtasksList = document.getElementById(`subtasks-${taskId}`);
+                const expandIcon = document.getElementById(`expand-${taskId}`);
+                
+                if (task.subtasksExpanded) {
+                    subtasksList.classList.remove('collapsed');
+                    expandIcon.classList.remove('collapsed');
+                } else {
+                    subtasksList.classList.add('collapsed');
+                    expandIcon.classList.add('collapsed');
+                }
+            }
         }
 
         function transferUnfinishedTasks() {
