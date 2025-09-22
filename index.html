@@ -546,6 +546,7 @@
                     <button onclick="changeWeek(-1)">← Previous Week</button>
                     <button onclick="goToCurrentWeek()">Current Week</button>
                     <button onclick="changeWeek(1)">Next Week →</button>
+                    <button onclick="transferUnfinishedTasks()" style="background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.3);">Transfer Unfinished</button>
                 </div>
             </div>
         </div>
@@ -1007,28 +1008,78 @@
         }
 
         function transferUnfinishedTasks() {
-            const today = new Date();
-            const dayOfWeek = today.getDay();
+            // Calculate previous week key
+            const [year, week] = currentWeek.split('-W');
+            let prevWeek = parseInt(week) - 1;
+            let prevYear = parseInt(year);
             
-            // Only run on Saturday (6) or Sunday (0) to check Friday completion
-            if (dayOfWeek === 6 || dayOfWeek === 0) {
-                const lastWeekKey = getCurrentWeekKey(); // This would need to be calculated for last week
-                const thisWeekKey = getCurrentWeekKey();
+            if (prevWeek < 1) {
+                prevYear--;
+                prevWeek = 52; // Approximate, could be 53
+            }
+            
+            const prevWeekKey = `${prevYear}-W${prevWeek}`;
+            
+            // Check if previous week has any unfinished tasks
+            if (!priorities[prevWeekKey]) {
+                showNotification("No previous week data found to transfer");
+                return;
+            }
+            
+            const unfinished = priorities[prevWeekKey].filter(task => task.status !== 'completed');
+            
+            if (unfinished.length === 0) {
+                showNotification("No unfinished tasks from previous week to transfer");
+                return;
+            }
+            
+            // Initialize current week if it doesn't exist
+            if (!priorities[currentWeek]) {
+                priorities[currentWeek] = [];
+            }
+            
+            // Ask for confirmation
+            const confirmMessage = `Transfer ${unfinished.length} unfinished task(s) from previous week?\n\nTasks to transfer:\n${unfinished.map(t => `• ${t.title}`).join('\n')}`;
+            
+            if (confirm(confirmMessage)) {
+                let transferredCount = 0;
                 
-                if (priorities[lastWeekKey]) {
-                    const unfinished = priorities[lastWeekKey].filter(task => task.status !== 'completed');
-                    if (unfinished.length > 0) {
-                        if (!priorities[thisWeekKey]) {
-                            priorities[thisWeekKey] = [];
-                        }
-                        unfinished.forEach(task => {
-                            task.id = Date.now() + Math.random(); // New ID
-                            task.status = 'not-started';
-                            task.startDate = null;
-                            priorities[thisWeekKey].push(task);
-                        });
-                        savePriorities();
+                unfinished.forEach(task => {
+                    // Check if task already exists in current week (avoid duplicates)
+                    const exists = priorities[currentWeek].some(existingTask => 
+                        existingTask.title === task.title && 
+                        existingTask.priority === task.priority
+                    );
+                    
+                    if (!exists) {
+                        const transferredTask = {
+                            ...task,
+                            id: Date.now() + Math.random(), // New unique ID
+                            status: 'not-started', // Reset status
+                            startDate: null, // Clear start date
+                            completedDate: null, // Clear completion date
+                            subtasksExpanded: true // Start expanded
+                        };
+                        
+                        // Keep subtasks but reset their completion status if desired
+                        // (Comment out the next 3 lines if you want to keep subtask completion status)
+                        transferredTask.subtasks = transferredTask.subtasks.map(subtask => ({
+                            ...subtask,
+                            completed: false // Reset subtask completion
+                        }));
+                        
+                        priorities[currentWeek].push(transferredTask);
+                        transferredCount++;
                     }
+                });
+                
+                savePriorities();
+                renderPriorities();
+                
+                if (transferredCount > 0) {
+                    showNotification(`Successfully transferred ${transferredCount} unfinished task(s) to current week!`);
+                } else {
+                    showNotification("All unfinished tasks were already present in current week");
                 }
             }
         }
@@ -1055,13 +1106,25 @@
         }
 
         function showNotification(message) {
+            // Remove any existing notifications first
+            const existingNotifications = document.querySelectorAll('.notification');
+            existingNotifications.forEach(notification => notification.remove());
+            
             const notification = document.createElement('div');
             notification.className = 'notification';
             notification.textContent = message;
+            
+            // Use green background for success messages
+            if (message.includes('Successfully') || message.includes('transferred')) {
+                notification.style.background = '#10b981';
+            }
+            
             document.body.appendChild(notification);
             
             setTimeout(() => {
-                notification.remove();
+                if (notification.parentNode) {
+                    notification.remove();
+                }
             }, 5000);
         }
 
